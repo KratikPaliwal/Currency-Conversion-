@@ -1,14 +1,25 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const baseUrl = "https://2024-03-06.currency-api.pages.dev/v1/currencies/eur.json";
     const dropdown = document.querySelectorAll('.dropdown-container select');
     const fromCurr = document.querySelector('form select[name="from"]');
     const toCurr = document.querySelector('form select[name="to"]');
+    const baseUrl = "https://api.exchangerate-api.com/v4/latest";
+    const amountInput = document.querySelector('.amount input');
+    const resultElement = document.querySelector('.msg');
 
+    // Ensure country_list is loaded
+    if (!country_list) {
+        console.error("country_list is not defined");
+        return;
+    }
+
+    // Populate dropdowns
     for (let select of dropdown) {
         for (let Code in country_list) {
             let newOption = document.createElement('option');
             newOption.innerHTML = Code;
             newOption.value = Code;
+
+            // Set default selections
             if (select.name === 'from' && Code === 'USD') {
                 newOption.selected = 'selected';
             } else if (select.name === 'to' && Code === 'INR') {
@@ -17,48 +28,65 @@ document.addEventListener('DOMContentLoaded', () => {
             select.append(newOption);
         }
 
-        select.addEventListener('change', (ent) => {
-            UpdateFlag(ent.target);
+        // Attach flag update listener
+        select.addEventListener('change', (event) => {
+            UpdateFlag(event.target);
         });
     }
 
+    // Update flag images
     const UpdateFlag = (ele) => {
-        let currcode = ele.value;
-        let countrycode = country_list[currcode];
-        let newSrc = `https://flagsapi.com/${countrycode}/flat/64.png`;
-        let img = ele.parentElement.querySelector('img');
-        img.src = newSrc;
+        const currcode = ele.value;
+        const countrycode = country_list[currcode];
+        if (countrycode) {
+            const newSrc = `https://flagsapi.com/${countrycode}/flat/64.png`;
+            const img = ele.parentElement.querySelector('img');
+            if (img) {
+                img.src = newSrc;
+            } else {
+                console.error("Image element not found");
+            }
+        } else {
+            console.error(`No country code found for ${currcode}`);
+        }
     };
 
-    const btn = document.querySelector('form button');
-    btn.addEventListener('click', (evt) => {
-        evt.preventDefault();
-        let amount = document.querySelector('.amount input');
-        let amountVal = amount.value;
+    // Handle conversion
+    const convertCurrency = () => {
+        let amountVal = amountInput.value;
         if (amountVal === '' || amountVal < 0) {
-            amount.value = '1';
+            amountInput.value = '1';
             amountVal = '1';
         }
 
-        fetch(`${baseUrl}?from=${fromCurr.value}&to=${toCurr.value}&amount=${amountVal}`)
-            .then((response) => response.json())
-            .then((data) => {
-                const convertedAmount = data.convertedAmount || 0;
-                const resultElement = document.querySelector('.msg'); // Changed from .result to .msg
-                if (resultElement) {
-                    resultElement.innerHTML = `${amountVal} ${fromCurr.value} = ${convertedAmount} ${toCurr.value}`;
+        console.log(`Converting ${amountVal} from ${fromCurr.value} to ${toCurr.value}`);
+
+        // Fetch exchange rates
+        fetch(`${baseUrl}/${fromCurr.value}`)
+            .then(response => response.json())
+            .then(data => {
+                const rate = data.rates[toCurr.value];
+                if (rate) {
+                    const convertedAmount = amountVal * rate;
+                    if (resultElement) {
+                        resultElement.innerHTML = `${amountVal} ${fromCurr.value} = ${convertedAmount.toFixed(2)} ${toCurr.value}`;
+                    }
                 } else {
-                    console.error('Result element not found');
+                    console.error(`Rate not found for ${toCurr.value}`);
                 }
             })
-            .catch((error) => {
+            .catch(error => {
                 console.error('Error fetching conversion:', error);
-                const resultElement = document.querySelector('.msg'); // Changed from .result to .msg
                 if (resultElement) {
-                    resultElement.innerHTML = `
-                        Failed to fetch conversion. Please try again.
-                    `;
+                    resultElement.innerHTML = "Error fetching conversion rates. Please try again later.";
                 }
             });
+    };
+
+    // Attach conversion event
+    const btn = document.querySelector('form button');
+    btn.addEventListener('click', (evt) => {
+        evt.preventDefault();
+        convertCurrency();
     });
 });
